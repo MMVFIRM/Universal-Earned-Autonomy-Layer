@@ -1,0 +1,67 @@
+# Policy-as-code for the sales_lead_generation workflow.
+#
+# This file is illustrative of the intended policy surface. The authority
+# ceilings and separation-of-duties rules below mirror the defaults compiled
+# into earned_autonomy.core.ontology and core.policy; an enterprise edits this
+# file rather than the code. A loader (earned_autonomy.core.policy can be
+# extended to parse this) maps each entry to a BoundaryRule / DelegationRule.
+#
+# NOTE: in v2 the loader for YAML policies is a thin adapter over the same
+# objects the tests exercise. The authoritative invariants (risk ceilings,
+# fail-closed guards, signed audit) live in code so they cannot be weakened by
+# an accidental YAML edit; YAML can only make policy MORE restrictive.
+
+workflow: sales_lead_generation
+description: Outbound qualification of inbound law-firm leads.
+
+# Authority classes this workflow is permitted to request at all. Anything not
+# listed is implicitly denied.
+permitted_authorities:
+  - observe
+  - search
+  - summarize
+  - score
+  - draft
+  - communicate_internally
+  - modify_internal_record
+  - communicate_externally
+  - offer_pricing_or_discount
+
+# Boundary rules: always evaluated first, can only restrict.
+boundary_rules:
+  - name: External communication needs approval until trust is earned
+    authority_classes: [communicate_externally]
+    status: approval_required
+    required_approver_role: marketing_owner
+
+  - name: Pricing requires a commercial owner and separation of duties
+    authority_classes: [offer_pricing_or_discount]
+    status: approval_required
+    required_approver_role: commercial_owner
+    separation_of_duties: true
+
+# Earned-autonomy ceilings per authority class (cannot exceed code defaults).
+autonomy_ceilings:
+  observe: delegated_authority
+  search: delegated_authority
+  summarize: delegated_authority
+  score: delegated_authority
+  draft: delegated_authority
+  communicate_internally: delegated_authority
+  modify_internal_record: delegated_authority
+  communicate_externally: conditional_autonomy
+  offer_pricing_or_discount: execute_with_sampling
+
+# Guards attached to any delegation rule generated for this workflow. Each is a
+# named predicate implemented in earned_autonomy.core.conditions. If any fires,
+# the action falls back to human approval.
+default_guards:
+  - missing_source_evidence
+  - low_confidence
+  - external_effect
+  - irreversible
+  - anomaly_detected
+  - policy_boundary_matched
+
+# Statistical thresholds are NOT configurable downward here; they are coupled to
+# consequence severity in code (Wilson lower bound + minimum sample size).

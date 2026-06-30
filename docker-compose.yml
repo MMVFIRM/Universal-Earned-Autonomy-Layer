@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: eal
+      POSTGRES_PASSWORD: eal
+      POSTGRES_DB: eal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      EAL_STRICT_MODE: "false"
+      EAL_DATABASE_URL: "postgresql+psycopg://eal:eal@db:5432/eal"
+      EAL_LEDGER_PATH: "/data/audit.log"
+      # Local-dev auth only. Production should set EAL_STRICT_MODE=true, issuer keys, and OIDC settings via an env file.
+      EAL_DEV_AUTH_SECRET: "dev-only-change-me"
+    ports:
+      - "8000:8000"
+    volumes:
+      - eal-data:/data
+
+volumes:
+  eal-data:

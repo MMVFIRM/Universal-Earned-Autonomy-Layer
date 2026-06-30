@@ -1,0 +1,38 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[api,sql,dev]"
+      - run: ruff check earned_autonomy tests
+      - run: pytest -q
+  integration-sql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: eal
+          POSTGRES_PASSWORD: eal
+          POSTGRES_DB: eal
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U eal" --health-interval 5s
+          --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[api,sql,dev]"
+      - run: EAL_DATABASE_URL="postgresql+psycopg://eal:eal@localhost:5432/eal" pytest -q -m sql
